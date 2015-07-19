@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Let's go together</title>
+
+    <meta charset="utf-8"/>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel='stylesheet' href='css/font-awesome/css/font-awesome.min.css'>
+
+    <link rel='stylesheet' href='js/lib/leaflet/leaflet.css'>
+    <link rel='stylesheet' href='js/lib/leaflet/Leaflet.vector-markers.css'>
+    <link rel="stylesheet" href='js/lib/leaflet/leaflet-routing-machine.css'>
+
+    <link rel='stylesheet' href='css/app.css'>
+</head>
+<body>
+<div id="map" style="width: 100%; height: 100%;"></div>
+
+<script src='js/lib/leaflet/leaflet.js'></script>
+<script src='js/lib/leaflet/Leaflet.vector-markers.min.js'></script>
+<script src="js/lib/leaflet/leaflet-routing-machine.min.js"></script>
+
+<script>
+    var distance_threshold = 500;
+
+    var me = {id: 1, name: 'Μάριος'};
+
+    var amea = [
+        {
+            id: 1,
+            name: 'Μάριος',
+            origin: {earliest: new Date(2015, 6, 19, 11, 0, 0, 0), coord: L.latLng(37.97888, 23.71159)},
+            destination: {latest: new Date(2015, 6, 19, 17, 0, 0, 0), coord: L.latLng(37.94152, 23.65263)}
+        },
+        {
+            id: 2,
+            name: 'Πέτρος',
+            origin: {earliest: new Date(2015, 6, 19, 12, 0, 0, 0), coord: L.latLng(37.99254, 23.67833)},
+            destination: {latest: new Date(2015, 6, 19, 15, 0, 0, 0), coord: L.latLng(37.94327, 23.64716)}
+        }
+    ];
+
+    var amea_candidates = [];
+
+</script>
+
+<script>
+    var map = L.map('map', {
+        zoomControl: false,
+        attributionControl: false,
+        center: [0, 0],
+        zoom: 0
+    });
+    map.addLayer(L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'));
+
+    map.locate({setView: true});
+
+    var me_map_origin = L.layerGroup().addTo(map);
+    var me_map_destination = L.layerGroup().addTo(map);
+
+    var amea_map_origin = L.layerGroup().addTo(map);
+    var amea_map_destination = L.layerGroup().addTo(map);
+
+    var routing;
+
+    map.on('locationfound', function (e) {
+        me.origin = e.latlng;
+
+        me_map_origin.clearLayers();
+
+        me_map_origin.addLayer(L.circleMarker(e.latlng, {
+            fillColor: '#0093CE',
+            fillOpacity: 0.9,
+            weight: 0
+        }).setRadius(10));
+        me_map_origin.addLayer(L.circleMarker(e.latlng, {
+            fillOpacity: 0.0,
+            weight: 2,
+            color: '#0093CE',
+            opacity: 0.9
+        }).setRadius(13));
+    });
+
+    map.on('click', function (e) {
+        me.destination = e.latlng;
+
+        me_map_destination.clearLayers();
+
+        me_map_destination.addLayer(L.circle(e.latlng, distance_threshold, {
+            fillColor: '#0093CE',
+            fillOpacity: 0.3,
+            weight: 0
+        }));
+
+        amea_candidates = [];
+        for (var i = 0; i < amea.length; i++) {
+            if (amea[i].destination.coord.distanceTo(e.latlng) <= distance_threshold)
+                amea_candidates.push(i);
+        }
+
+        if (routing) {
+            map.removeControl(routing);
+            routing = null;
+        }
+
+        amea_map_destination.clearLayers();
+
+        amea_map_origin.clearLayers();
+        for (var i = 0; i < amea_candidates.length; i++) {
+            amea_map_origin.addLayer(L.marker(amea[amea_candidates[i]].origin.coord, {
+                icon: L.VectorMarkers.icon({
+                    icon: 'wheelchair',
+                    markerColor: '#E90D90'
+                })
+            }).bindPopup(amea[amea_candidates[i]].name + '<br/>Μπορεί να φύγει το νωρίτερο στις ' + amea[amea_candidates[i]].origin.earliest.toLocaleString()).on('click', function (e) {
+                amea_map_destination.clearLayers();
+
+                amea_map_destination.addLayer(L.marker(amea[this.index].destination.coord, {
+                    icon: L.VectorMarkers.icon({
+                        icon: 'flag-checkered',
+                        markerColor: '#E90D90'
+                    })
+                }).bindPopup('Πρέπει να φτάσει το αργότερο στις ' + amea[this.index].destination.latest.toLocaleString()));
+
+                if (routing) {
+                    map.removeControl(routing);
+                    routing = null;
+                }
+
+                routing = L.Routing.control({
+                    waypoints: [
+                        me.origin,
+                        amea[this.index].origin.coord,
+                        amea[this.index].destination.coord
+                    ],
+                    fitSelectedRoutes: false
+                }).addTo(map);
+
+                routing.getPlan()._removeMarkers();
+            }, {index: amea_candidates[i]}));
+        }
+    });
+</script>
+</body>
+</html>
